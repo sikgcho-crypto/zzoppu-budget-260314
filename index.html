@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>쬬쀼 가계부</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script>
+tailwind.config={theme:{extend:{colors:{ink:'#111827',soft:'#F9F8F5',card:'#FFFFFF',border:'#E5E2DA',muted:'#6B7280',inc:'#059669',exp:'#DC2626',fix:'#6366F1',loan:'#D97706'}}}}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;background:#F9F8F5;color:#111827;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:2px;}
+
+/* SIDEBAR */
+#sidebar{width:200px;flex-shrink:0;}
+@media(max-width:767px){#sidebar{display:none;}#bot-nav{display:flex;}#main{margin-bottom:68px;}}
+@media(min-width:768px){#bot-nav{display:none;}}
+
+/* NAV ACTIVE */
+.sb-item{padding:9px 14px;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s;color:rgba(255,255,255,.55);}
+.sb-item:hover{color:#fff;background:rgba(255,255,255,.1);}
+.sb-item.active{color:#fff;background:rgba(255,255,255,.15);}
+
+/* MONTH CHIP */
+.mchip{padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.mchip.active{background:#111827;color:#fff;}
+.mchip:not(.active){background:#fff;color:#6B7280;border:1px solid #E5E2DA;}
+
+/* MOBILE NAV */
+#bot-nav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:1px solid #E5E2DA;padding:6px 0 env(safe-area-inset-bottom);}
+.bnav{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0;cursor:pointer;font-size:10px;font-weight:500;color:#9CA3AF;transition:color .15s;}
+.bnav.active{color:#111827;}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;border-bottom:1px solid #E5E2DA;white-space:nowrap;text-align:left;}
+.tbl td{padding:10px 12px;border-bottom:1px solid #F9F8F5;vertical-align:middle;}
+.tbl tbody tr:last-child td{border-bottom:none;}
+.tbl tbody tr:hover td{background:#FAFAF8;}
+.tbl tfoot td{padding:10px 12px;background:#F9F8F5;border-top:2px solid #E5E2DA;font-weight:700;font-size:13px;}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end;justify-content:center;}
+@media(min-width:640px){.modal-bg{align-items:center;}}
+.modal-box{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
+@media(min-width:640px){.modal-box{border-radius:16px;}}
+
+/* PROGRESS */
+.prog{height:4px;background:#E5E2DA;border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:2px;transition:width .4s;}
+
+/* INPUT */
+.finput{width:100%;padding:10px 12px;border:1.5px solid #E5E2DA;border-radius:10px;font-size:14px;font-family:inherit;background:#F9F8F5;color:#111827;outline:none;transition:border .15s;}
+.finput:focus{border-color:#9CA3AF;background:#fff;}
+
+/* KPI */
+.kpi{background:#fff;border:1px solid #E5E2DA;border-radius:16px;padding:14px 16px;}
+.kpi-val{font-size:clamp(16px,3.5vw,24px);font-weight:700;letter-spacing:-.03em;line-height:1.1;}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;}
+
+/* TX ITEM (mobile) */
+.tx-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F3F2EF;}
+.tx-item:last-child{border-bottom:none;}
+.tx-icon{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+
+/* MOBILE QUICK INPUT SHEET */
+.quick-btn{
+  position:fixed;bottom:76px;right:16px;z-index:150;
+  width:52px;height:52px;border-radius:50%;
+  background:#111827;color:#fff;border:none;
+  font-size:22px;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.25);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .15s;
+}
+.quick-btn:active{transform:scale(.92);}
+@media(min-width:768px){.quick-btn{display:none;}}
+
+/* MOBILE CARD SECTION */
+.mob-section{background:#fff;border-radius:18px;overflow:hidden;border:1px solid #E5E2DA;margin-bottom:12px;}
+.mob-section-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F3F2EF;}
+.mob-section-title{font-size:12px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;}
+
+/* KPI MOBILE */
+.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+@media(min-width:768px){.kpi-row{grid-template-columns:repeat(4,1fr);}}
+
+/* MONTH NAV SCROLL */
+#month-nav{gap:6px;}
+#month-nav select{outline:none;}
+
+/* FORM COMPACT */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media(min-width:640px){.form-row{grid-template-columns:repeat(3,1fr);}}
+@media(min-width:1024px){.form-row{grid-template-columns:repeat(4,1fr);}}
+
+/* EMPTY STATE */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;}
+.empty-state .icon{font-size:40px;margin-bottom:12px;opacity:.4;}
+
+/* SWIPE HINT */
+.badge-dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+</style>
+</head>
+<body>
+
+<div id="app" class="flex h-screen overflow-hidden">
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside id="sidebar" class="flex flex-col overflow-hidden" style="background:#111827;">
+  <div class="p-5 border-b" style="border-color:rgba(255,255,255,.1)">
+    <div class="text-white font-bold text-sm">🏠 쬬쀼 가계부</div>
+    <div id="sb-date" class="text-xs mt-1" style="color:rgba(255,255,255,.35)"></div>
+  </div>
+  <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
+    <div class="sb-item active" data-v="dash"><i class="fa-solid fa-chart-pie w-4"></i>대시보드</div>
+    <div class="sb-item" data-v="ledger"><i class="fa-solid fa-pen-to-square w-4"></i>가계부 입력</div>
+    <div class="sb-item" data-v="fixed"><i class="fa-solid fa-thumbtack w-4"></i>고정지출</div>
+    <div class="sb-item" data-v="loan"><i class="fa-solid fa-landmark w-4"></i>대출/자산</div>
+    <div class="sb-item" data-v="trend"><i class="fa-solid fa-chart-line w-4"></i>연간 추이</div>
+  </nav>
+  <div class="p-3 border-t space-y-1.5" style="border-color:rgba(255,255,255,.1)">
+    <button onclick="exportExcel()" class="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-colors" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);">
+      <i class="fa-solid fa-file-excel"></i> 엑셀 전체 추출
+    </button>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<main id="main" class="flex-1 overflow-y-auto">
+
+  <!-- TOPBAR -->
+  <header class="sticky top-0 z-100 flex items-center gap-3 px-4 md:px-6" style="height:52px;background:rgba(249,248,245,.95);backdrop-filter:blur(8px);border-bottom:1px solid #E5E2DA;z-index:100;">
+    <span class="font-bold text-sm md:hidden">🏠 쬬쀼 가계부</span>
+    <div id="month-nav" class="flex items-center gap-1.5 overflow-x-auto flex-1" style="scrollbar-width:none;-ms-overflow-style:none;"></div>
+    <button onclick="exportExcel()" class="flex-shrink-0 flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 transition-colors">
+      <i class="fa-solid fa-file-excel"></i><span class="hidden sm:inline">엑셀</span>
+    </button>
+  </header>
+
+  <!-- ── 대시보드 ── -->
+  <div id="v-dash" style="padding:14px;" class="md:p-6 space-y-4">
+    <div class="kpi-row" id="kpi-wrap"></div>
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;" class="md:grid-cols-5 md:grid">
+      <div class="md:col-span-2 bg-white rounded-2xl border border-border p-4">
+        <div class="text-xs font-bold text-muted uppercase tracking-widest mb-3">지출 구성</div>
+        <div style="position:relative;height:200px;"><canvas id="c-donut"></canvas></div>
+        <div id="donut-leg" class="mt-3 space-y-1.5"></div>
+      </div>
+      <div class="md:col-span-3 bg-white rounded-2xl border border-border p-4">
+        <div class="text-xs font-bold text-muted uppercase tracking-widest mb-3">카테고리별 지출</div>
+        <div style="position:relative;height:240px;"><canvas id="c-bar"></canvas></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold text-muted uppercase tracking-widest">이번달 거래내역</span>
+        <button onclick="openAdd()" class="flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold text-white bg-ink hover:opacity-80 transition-opacity">
+          <i class="fa-solid fa-plus"></i> 거래 추가
+        </button>
+      </div>
+      <!-- 모바일 카드형 -->
+      <div id="tx-cards" class="md:hidden space-y-0"></div>
+      <!-- PC 테이블 -->
+      <div class="hidden md:block overflow-x-auto">
+        <table class="tbl"><thead><tr>
+          <th>날짜</th><th>내용</th><th>분류</th><th>카테고리</th><th>누가</th><th>결제수단</th><th class="text-right">금액</th><th></th>
+        </tr></thead><tbody id="tx-tbody"></tbody></table>
+      </div>
+      <div id="tx-sum" class="text-right text-xs text-muted mt-2 pt-2 border-t border-border"></div>
+    </div>
+  </div>
+
+  <!-- ── 가계부 입력 ── -->
+  <div id="v-ledger" class="hidden p-4 md:p-6 space-y-4">
+    <!-- 빠른 입력 폼 -->
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="text-xs font-bold text-muted uppercase tracking-widest mb-4">거래 입력</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">내용 *</label>
+          <input id="f-content" class="finput" style="margin-top:5px;" placeholder="예) 마트 장보기">
+        </div>
+        <div class="form-row">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">날짜 *</label>
+            <input type="date" id="f-date" class="finput" style="margin-top:5px;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">분류</label>
+            <select id="f-type" class="finput" style="margin-top:5px;">
+              <option value="지출">💸 지출</option>
+              <option value="수입">💰 수입</option>
+              <option value="저축">🏦 저축</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">카테고리</label>
+            <select id="f-cat" class="finput" style="margin-top:5px;"></select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">금액 *</label>
+            <input type="text" id="f-amt" class="finput num" style="margin-top:5px;" placeholder="50,000">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">누가</label>
+            <select id="f-who" class="finput" style="margin-top:5px;">
+              <option>아내</option><option>남편</option><option>공동</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">결제수단</label>
+            <select id="f-pay" class="finput" style="margin-top:5px;">
+              <option value="">선택안함</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="submitTx()" style="width:100%;padding:12px;border-radius:12px;font-size:14px;font-weight:600;color:#fff;background:#111827;border:none;cursor:pointer;transition:opacity .15s;">
+          <i class="fa-solid fa-plus" style="margin-right:6px;"></i> 추가하기
+        </button>
+      </div>
+    </div>
+    <!-- 전체 거래내역 테이블 -->
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <span class="text-xs font-bold text-muted uppercase tracking-widest">전체 거래내역 (이번달)</span>
+        <div class="flex gap-2">
+          <select id="filt-type" class="finput text-xs py-1.5" style="width:auto;padding:6px 10px;">
+            <option value="">전체</option><option value="지출">지출</option><option value="수입">수입</option><option value="저축">저축</option>
+          </select>
+          <button onclick="exportExcel('tx')" class="py-1.5 px-3 rounded-lg text-xs font-semibold text-green-700 border border-green-200 bg-green-50">📥 엑셀</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="tbl"><thead><tr>
+          <th>날짜</th><th>내용</th><th>분류</th><th>카테고리</th><th>누가</th><th>결제수단</th><th class="text-right">금액</th><th></th>
+        </tr></thead><tbody id="ledger-tbody"></tbody>
+        <tfoot><tr>
+          <td colspan="6">이번달 합계</td>
+          <td id="ledger-sum" class="text-right text-exp"></td><td></td>
+        </tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 고정지출 ── -->
+  <div id="v-fixed" class="hidden p-4 md:p-6 space-y-4">
+    <!-- 입력폼 -->
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="text-xs font-bold text-muted uppercase tracking-widest mb-4">고정지출 추가</div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="col-span-2 md:col-span-1">
+          <label class="text-xs font-semibold text-muted">항목명 *</label>
+          <input id="fx-name" class="finput mt-1" placeholder="넷플릭스">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">카테고리</label>
+          <select id="fx-cat" class="finput mt-1">
+            <option>📺 구독</option><option>📱 통신</option><option>🏥 보험</option>
+            <option>🏠 주거</option><option>🚗 교통</option><option>🏦 금융</option><option>📌 기타</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">결제수단</label>
+          <select id="fx-card" class="finput mt-1">
+            <option value="">미연결</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">결제일</label>
+          <select id="fx-due" class="finput mt-1">
+            <option value="">미설정</option>
+            <script>for(var di=1;di<=31;di++)document.write('<option value="'+di+'">'+di+'일</option>');</script>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">금액 *</label>
+          <input type="text" id="fx-amt" class="finput mt-1 num" placeholder="0">
+        </div>
+        <div class="col-span-2 md:col-span-5 flex justify-end">
+          <button onclick="addFixed()" class="py-2.5 px-6 rounded-xl text-sm font-semibold text-white bg-ink hover:opacity-80 transition-opacity">
+            <i class="fa-solid fa-plus mr-1"></i> 추가
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 뷰 탭 -->
+    <div class="flex gap-2" id="fx-view-tabs">
+      <button class="mchip active" data-fv="list">📋 목록</button>
+      <button class="mchip" data-fv="card">💳 카드별</button>
+    </div>
+    <!-- 목록 뷰 -->
+    <div id="fx-list-view">
+      <div class="bg-white rounded-2xl border border-border overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="tbl"><thead><tr>
+            <th>항목명</th><th>카테고리</th><th>결제수단</th><th>결제일</th><th class="text-right">금액</th><th></th>
+          </tr></thead><tbody id="fx-tbody"></tbody>
+          <tfoot><tr>
+            <td colspan="4">월 고정지출 합계</td>
+            <td id="fx-total" class="text-right text-exp"></td><td></td>
+          </tr></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- 카드별 뷰 -->
+    <div id="fx-card-view" class="hidden" id="fx-card-view"></div>
+  </div>
+
+  <!-- ── 대출/자산 ── -->
+  <div id="v-loan" class="hidden p-4 md:p-6 space-y-4">
+    <!-- KPI -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="loan-kpi"></div>
+    <!-- 대출 입력 -->
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="text-xs font-bold text-muted uppercase tracking-widest mb-4">대출 추가</div>
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div class="col-span-2 md:col-span-2">
+          <label class="text-xs font-semibold text-muted">금융사/대출명 *</label>
+          <input id="ln-name" class="finput mt-1" placeholder="토스뱅크 신용1">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">잔액 *</label>
+          <input type="text" id="ln-bal" class="finput mt-1 num" placeholder="0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">월 원금 (0=이자만)</label>
+          <input type="text" id="ln-prin" class="finput mt-1 num" placeholder="0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">월 이자</label>
+          <input type="text" id="ln-int" class="finput mt-1 num" placeholder="0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">납입일</label>
+          <select id="ln-due" class="finput mt-1">
+            <option value="">미설정</option>
+            <script>for(var di=1;di<=31;di++)document.write('<option value="'+di+'">'+di+'일</option>');</script>
+          </select>
+        </div>
+        <div class="col-span-2 md:col-span-6 flex justify-end">
+          <button onclick="addLoan()" class="py-2.5 px-6 rounded-xl text-sm font-semibold text-white bg-ink hover:opacity-80">
+            <i class="fa-solid fa-plus mr-1"></i> 추가
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 대출 테이블 -->
+    <div class="bg-white rounded-2xl border border-border overflow-hidden">
+      <div class="p-4 border-b border-border text-xs font-bold text-muted uppercase tracking-widest">대출 현황</div>
+      <div class="overflow-x-auto">
+        <table class="tbl"><thead><tr>
+          <th>금융사</th><th class="text-right">잔액</th><th class="text-right">추정잔액</th>
+          <th class="text-right">월원금</th><th class="text-right">월이자</th><th>납입일</th><th>경과</th><th></th>
+        </tr></thead><tbody id="ln-tbody"></tbody>
+        <tfoot><tr>
+          <td>합계</td>
+          <td id="ln-t-bal" class="text-right text-exp"></td>
+          <td id="ln-t-cur" class="text-right text-exp"></td>
+          <td id="ln-t-prin" class="text-right"></td>
+          <td id="ln-t-int" class="text-right"></td>
+          <td colspan="3"></td>
+        </tr></tfoot>
+        </table>
+      </div>
+    </div>
+    <!-- 자산 입력 -->
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="text-xs font-bold text-muted uppercase tracking-widest mb-4">자산 추가</div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="col-span-2 md:col-span-2">
+          <label class="text-xs font-semibold text-muted">자산명 *</label>
+          <input id="as-name" class="finput mt-1" placeholder="DB화재 보험">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">종류</label>
+          <select id="as-type" class="finput mt-1">
+            <option>🏠 부동산</option><option>🚗 자동차</option><option>💰 예금/적금</option>
+            <option>📈 투자</option><option>🔑 보증금</option><option>🛡 보험</option><option>📌 기타</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">금액 *</label>
+          <input type="text" id="as-amt" class="finput mt-1 num" placeholder="0">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-muted">비고</label>
+          <input id="as-memo" class="finput mt-1" placeholder="선택">
+        </div>
+        <div class="col-span-2 md:col-span-5 flex justify-end">
+          <button onclick="addAsset()" class="py-2.5 px-6 rounded-xl text-sm font-semibold text-white bg-ink hover:opacity-80">
+            <i class="fa-solid fa-plus mr-1"></i> 추가
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 자산 테이블 -->
+    <div class="bg-white rounded-2xl border border-border overflow-hidden">
+      <div class="p-4 border-b border-border text-xs font-bold text-muted uppercase tracking-widest">자산 현황</div>
+      <div class="overflow-x-auto">
+        <table class="tbl"><thead><tr>
+          <th>자산명</th><th>종류</th><th class="text-right">금액</th><th>비고</th><th></th>
+        </tr></thead><tbody id="as-tbody"></tbody>
+        <tfoot><tr>
+          <td colspan="2">총 자산</td>
+          <td id="as-total" class="text-right text-inc"></td><td colspan="2"></td>
+        </tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 연간추이 ── -->
+  <div id="v-trend" class="hidden p-4 md:p-6 space-y-4">
+    <div class="bg-white rounded-2xl border border-border p-4">
+      <div class="text-xs font-bold text-muted uppercase tracking-widest mb-3" id="trend-title">월별 지출 추이</div>
+      <div style="position:relative;height:280px;"><canvas id="c-trend"></canvas></div>
+    </div>
+    <div class="bg-white rounded-2xl border border-border overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="tbl"><thead><tr>
+          <th>월</th><th class="text-right">고정지출</th><th class="text-right">변동지출</th>
+          <th class="text-right">대출상환</th><th class="text-right">수입</th><th class="text-right">총지출</th>
+        </tr></thead><tbody id="trend-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- FAB: 모바일 빠른 입력 -->
+<button class="quick-btn" onclick="switchView('ledger');setTimeout(function(){var el=document.getElementById('f-content');if(el)el.focus();},300);" title="거래 추가">
+  <i class="fa-solid fa-plus" style="font-size:18px;"></i>
+</button>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav id="bot-nav" class="hidden">
+  <div class="bnav active" data-v="dash"><i class="fa-solid fa-chart-pie text-base"></i>대시보드</div>
+  <div class="bnav" data-v="ledger"><i class="fa-solid fa-pen-to-square text-base"></i>입력</div>
+  <div class="bnav" data-v="fixed"><i class="fa-solid fa-thumbtack text-base"></i>고정지출</div>
+  <div class="bnav" data-v="loan"><i class="fa-solid fa-landmark text-base"></i>대출</div>
+  <div class="bnav" data-v="trend"><i class="fa-solid fa-chart-line text-base"></i>추이</div>
+</nav>
+
+<!-- ══════════ 수정 모달 ══════════ -->
+<div id="modal-bg" class="modal-bg hidden">
+  <div class="modal-box">
+    <div class="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+      <h2 id="modal-title" class="font-bold text-base">수정</h2>
+      <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-soft flex items-center justify-center text-muted hover:bg-border transition-colors">✕</button>
+    </div>
+    <div id="modal-body" class="p-4 overflow-y-auto flex-1"></div>
+    <div class="p-4 border-t border-border flex gap-2 flex-shrink-0">
+      <button id="modal-del" class="py-2.5 px-4 rounded-xl text-sm font-semibold text-exp border border-red-200 bg-red-50 hover:bg-red-100 transition-colors">
+        <i class="fa-solid fa-trash mr-1"></i> 삭제
+      </button>
+      <div class="flex-1"></div>
+      <button onclick="closeModal()" class="py-2.5 px-4 rounded-xl text-sm font-semibold text-muted border border-border bg-soft">취소</button>
+      <button id="modal-save" class="py-2.5 px-5 rounded-xl text-sm font-semibold text-white bg-ink hover:opacity-80 transition-opacity">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════
+   1. 데이터 스토리지
+═══════════════════════════════════════════════════ */
+var KEYS = {cards:'zz2_cards', loans:'zz2_loans', assets:'zz2_assets', fixed:'zz2_fixed', txs:'zz2_txs', cats:'zz2_cats', years:'zz2_years'};
+
+// localStorage 사용 가능 여부
+var _ls = (function(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true;}catch(e){return false;}})();
+var _mem = {};
+function lsGet(k){try{return _ls?localStorage.getItem(k):(_mem[k]||null);}catch(e){return null;}}
+function lsSet(k,v){try{if(_ls)localStorage.setItem(k,v);else _mem[k]=v;}catch(e){}}
+
+var D = {
+  cards: [], loans: [], assets: [], fixed: [], txs: [],
+  cats: ['🍽️ 식비','🚇 교통','⛽ 주유','🛵 배달','🍜 외식','🛒 마트/편의','☕ 카페','💊 의료','👕 의류','🎬 문화/여가','✈️ 여행','🎁 경조사','💼 월급','💎 보너스','📈 투자수익','📌 기타'],
+  years: ['2026']
+};
+
+// 샘플 초기 데이터
+var SEED = {
+  cards: [], loans: [], assets: [], fixed: [], txs: [],
+  years: ['2026']
+};
+
+function loadData(){
+  var keys = Object.keys(KEYS);
+  for(var i=0;i<keys.length;i++){
+    var k = keys[i];
+    var v = lsGet(KEYS[k]);
+    if(v){ try{D[k]=JSON.parse(v);}catch(e){} }
+    else if(SEED[k]){ D[k] = JSON.parse(JSON.stringify(SEED[k])); saveData(k); }
+  }
+}
+function saveData(k){ lsSet(KEYS[k], JSON.stringify(D[k])); }
+function nextId(){ return Date.now() + Math.floor(Math.random()*1000); }
+
+/* ════════════════════════════════════════════════
+   2. 유틸
+═══════════════════════════════════════════════════ */
+var fmt = function(n){ return Math.abs(n||0).toLocaleString('ko-KR')+'원'; };
+var fmtK = function(n){ return Math.round((n||0)/10000)+'만'; };
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function parseNum(s){ return parseInt(String(s||0).replace(/,/g,''))||0; }
+function thisMonth(){ var n=new Date(); return n.getFullYear()+'-'+(n.getMonth()<9?'0':'')+(n.getMonth()+1); }
+function getMonthTxs(m){ var mo=m||state.month; return D.txs.filter(function(t){return t.date&&t.date.indexOf(mo)===0;}); }
+
+function calcLoanBal(l){
+  if(!l.prin||!l.startYM) return l.bal;
+  var now=new Date(); var p=l.startYM.split('-');
+  var elapsed=(now.getFullYear()-parseInt(p[0]))*12+(now.getMonth()+1-parseInt(p[1]));
+  return Math.max(0, l.bal - l.prin*Math.max(0,elapsed-1));
+}
+function elapsedMo(l){
+  if(!l.startYM)return 0;
+  var now=new Date(); var p=l.startYM.split('-');
+  return Math.max(0,(now.getFullYear()-parseInt(p[0]))*12+(now.getMonth()+1-parseInt(p[1]))-1);
+}
+function nextPayDate(due){
+  if(!due)return '-';
+  var now=new Date(); var d=parseInt(due);
+  var t=new Date(now.getFullYear(),now.getMonth(),d);
+  if(t<=now) t=new Date(now.getFullYear(),now.getMonth()+1,d);
+  return (t.getMonth()+1)+'월 '+t.getDate()+'일';
+}
+
+/* ════════════════════════════════════════════════
+   3. 상태 & 초기화
+═══════════════════════════════════════════════════ */
+var state = { view:'dash', month:'' };
+var charts = {};
+
+function init(){
+  loadData();
+  var n = new Date();
+  // 시작 연도 2026 고정, 현재 월 자동 선택 (2026년 이후면 현재 연도 사용)
+  var curRealYear = n.getFullYear();
+  var startYear = curRealYear >= 2026 ? String(curRealYear) : '2026';
+  // D.years에 없으면 추가
+  if((D.years||[]).indexOf(startYear) < 0){ D.years = (D.years||['2026']).concat([startYear]).sort(); saveData('years'); }
+  state.month = startYear+'-'+(n.getMonth()<9?'0':'')+(n.getMonth()+1);
+  // 헤더 날짜
+  var sd = document.getElementById('sb-date');
+  if(sd){ var days=['일','월','화','수','목','금','토']; sd.textContent=n.getFullYear()+'.'+(n.getMonth()+1).toString().padStart(2,'0')+'.'+n.getDate().toString().padStart(2,'0')+' ('+days[n.getDay()]+')'; }
+  // num inputs
+  document.querySelectorAll('.num').forEach(numify);
+  renderMonthNav();
+  fillSelects();
+  renderAll();
+  // 탭 이벤트
+  document.querySelectorAll('.sb-item,[data-v]').forEach(function(el){
+    el.addEventListener('click',function(){ if(el.dataset.v) switchView(el.dataset.v); });
+  });
+  // 고정지출 뷰탭
+  document.getElementById('fx-view-tabs').addEventListener('click',function(e){
+    var b=e.target.closest('[data-fv]'); if(!b)return;
+    document.querySelectorAll('#fx-view-tabs .mchip').forEach(function(x){x.classList.toggle('active',x===b);});
+    document.getElementById('fx-list-view').classList.toggle('hidden',b.dataset.fv!=='list');
+    document.getElementById('fx-card-view').classList.toggle('hidden',b.dataset.fv!=='card');
+  });
+  // 거래 필터
+  var filt = document.getElementById('filt-type');
+  if(filt) filt.addEventListener('change',function(){renderLedger();});
+  window.addEventListener('resize',function(){renderTxs();});
+}
+
+/* ════════════════════════════════════════════════
+   4. 셀렉트 채우기
+═══════════════════════════════════════════════════ */
+function fillSelects(){
+  var catOpt = D.cats.map(function(c){return '<option>'+esc(c)+'</option>';}).join('');
+  var catEl = document.getElementById('f-cat'); if(catEl) catEl.innerHTML=catOpt;
+
+  var cardOpts = '<option value="">선택안함</option>'+D.cards.map(function(c){return '<option>'+esc(c.name)+'</option>';}).join('');
+  var payEl = document.getElementById('f-pay'); if(payEl) payEl.innerHTML=cardOpts;
+  var fxc = document.getElementById('fx-card');
+  if(fxc){ fxc.innerHTML='<option value="">미연결</option>'+D.cards.map(function(c){return '<option>'+esc(c.name)+'</option>';}).join(''); }
+}
+
+/* ════════════════════════════════════════════════
+   5. 월 네비
+═══════════════════════════════════════════════════ */
+// 연도 목록: D.years 기준 (저장된 연도 + 거래가 있는 연도 자동 병합)
+function getYears(){
+  var ySet = {};
+  // 저장된 연도 목록
+  (D.years||['2026']).forEach(function(y){ ySet[y]=1; });
+  // 거래가 있는 연도도 자동 포함
+  D.txs.forEach(function(t){ if(t.date) ySet[t.date.slice(0,4)]=1; });
+  return Object.keys(ySet).sort();
+}
+function addYear(y){
+  if(!y) return;
+  if((D.years||[]).indexOf(y) < 0){
+    D.years = (D.years||['2026']).concat([y]).sort();
+    saveData('years');
+  }
+  state.month = y + '-' + state.month.slice(5);
+  renderMonthNav(); renderAll();
+}
+
+var MNAMES=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+function renderMonthNav(){
+  var nav = document.getElementById('month-nav');
+  var years = getYears();
+  var curY = state.month.slice(0,4);
+  // 연도가 목록에 없으면 현재 연도로 보정
+  if(years.indexOf(curY) < 0){ curY = years[years.length-1]; state.month = curY + '-' + state.month.slice(5); }
+
+  // 연도 선택 드롭박스
+  var yearHtml =
+    '<select id="year-sel" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1.5px solid #E5E2DA;background:#fff;font-size:13px;font-weight:700;color:#111827;cursor:pointer;outline:none;">'+
+    years.map(function(y){return '<option value="'+y+'"'+(y===curY?' selected':'')+'>'+y+'년</option>';}).join('')+
+    '</select>';
+
+  // + 연도 추가 버튼
+  var addYearBtn =
+    '<button id="btn-add-year" title="연도 추가" style="flex-shrink:0;width:30px;height:30px;border-radius:8px;border:1.5px dashed #D1D5DB;background:transparent;color:#9CA3AF;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;" onmouseover="this.style.borderColor=\'#111827\';this.style.color=\'#111827\';" onmouseout="this.style.borderColor=\'#D1D5DB\';this.style.color=\'#9CA3AF\';">+</button>';
+
+  // 월 칩
+  var monthHtml = MNAMES.map(function(mn,i){
+    var m = curY+'-'+(i<9?'0':'')+(i+1);
+    return '<button class="mchip'+(m===state.month?' active':'')+'" data-m="'+m+'">'+mn+'</button>';
+  }).join('');
+
+  nav.innerHTML = yearHtml + addYearBtn + monthHtml;
+
+  document.getElementById('year-sel').addEventListener('change',function(){
+    var y=this.value, mo=state.month.slice(5);
+    state.month=y+'-'+mo;
+    renderMonthNav(); renderAll();
+  });
+  document.getElementById('btn-add-year').addEventListener('click',function(){
+    var years2 = getYears();
+    var nextY = String(parseInt(years2[years2.length-1])+1);
+    var input = window.prompt('추가할 연도를 입력하세요 (예: '+nextY+')', nextY);
+    if(!input) return;
+    var y = input.trim();
+    if(!/^\d{4}$/.test(y)){ alert('연도는 4자리 숫자로 입력해주세요 (예: 2027)'); return; }
+    addYear(y);
+  });
+  nav.querySelectorAll('.mchip').forEach(function(b){
+    b.addEventListener('click',function(){ state.month=b.dataset.m; renderMonthNav(); renderAll(); });
+  });
+}
+// MONTHS를 동적으로 계산 (연간 추이용)
+function getMonthsOfYear(y){
+  return MNAMES.map(function(_,i){return y+'-'+(i<9?'0':'')+(i+1);});
+}
+
+/* ════════════════════════════════════════════════
+   6. 숫자 콤마
+═══════════════════════════════════════════════════ */
+function numify(el){
+  el.addEventListener('input',function(){ var r=el.value.replace(/[^0-9]/g,''); el.value=r?parseInt(r).toLocaleString('ko-KR'):''; });
+  el.addEventListener('focus',function(){ el.value=el.value.replace(/,/g,''); });
+  el.addEventListener('blur',function(){ var r=el.value.replace(/[^0-9]/g,''); if(r) el.value=parseInt(r).toLocaleString('ko-KR'); });
+}
+
+/* ════════════════════════════════════════════════
+   7. 대시보드 렌더
+═══════════════════════════════════════════════════ */
+function renderDash(){
+  var txs = getMonthTxs();
+  var inc = txs.filter(function(t){return t.type==='수입';}).reduce(function(a,t){return a+t.amt;},0);
+  var expDirect = txs.filter(function(t){return t.type==='지출';}).reduce(function(a,t){return a+t.amt;},0);
+  var fixedTot = D.fixed.reduce(function(a,f){return a+f.amt;},0);
+  var loanPay = D.loans.reduce(function(a,l){return a+l.prin+l.int;},0);
+  var expTotal = expDirect+fixedTot+loanPay;
+  var rem = inc-expTotal;
+  var day = new Date().getDate();
+
+  // KPI
+  var kpiData = [
+    {l:'이번달 수입',v:fmt(inc),s:txs.filter(function(t){return t.type==='수입';}).length+'건',col:'#059669',bg:'#ECFDF5',i:'fa-arrow-down-long'},
+    {l:'총 지출',v:fmt(expTotal),s:'직접+고정+대출',col:'#DC2626',bg:'#FEF2F2',i:'fa-arrow-up-long'},
+    {l:'잔여',v:fmt(Math.abs(rem)),s:rem>=0?'여유':'초과',col:rem>=0?'#059669':'#DC2626',bg:rem>=0?'#ECFDF5':'#FEF2F2',i:'fa-wallet'},
+    {l:'일평균',v:fmt(day?Math.round(expTotal/day):0),s:day+'일 기준',col:'#6B7280',bg:'#F9FAFB',i:'fa-calendar-day'},
+  ];
+  document.getElementById('kpi-wrap').innerHTML = kpiData.map(function(k){
+    return '<div style="background:#fff;border:1px solid #E5E2DA;border-radius:16px;padding:14px 16px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'+
+        '<span style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;">'+k.l+'</span>'+
+        '<span style="width:28px;height:28px;border-radius:8px;background:'+k.bg+';display:flex;align-items:center;justify-content:center;">'+
+          '<i class="fa-solid '+k.i+'" style="font-size:11px;color:'+k.col+';"></i></span>'+
+      '</div>'+
+      '<div style="font-size:clamp(15px,3.5vw,22px);font-weight:700;letter-spacing:-.03em;color:'+k.col+';">'+k.v+'</div>'+
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:3px;">'+k.s+'</div>'+
+    '</div>';
+  }).join('');
+
+  // 도넛 차트
+  if(charts.donut) charts.donut.destroy();
+  var dCtx = document.getElementById('c-donut');
+  if(dCtx){
+    var dLabels=['직접지출','고정지출','대출상환'], dVals=[expDirect,fixedTot,loanPay], dColors=['#F59E0B','#6366F1','#EF4444'];
+    var dTot = expDirect+fixedTot+loanPay;
+    charts.donut = new Chart(dCtx.getContext('2d'),{type:'doughnut',data:{labels:dLabels,datasets:[{data:dVals,backgroundColor:dColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+fmt(c.raw);}}}}}});
+    document.getElementById('donut-leg').innerHTML = dLabels.map(function(l,i){
+      var pct = dTot?Math.round(dVals[i]/dTot*100):0;
+      return '<div class="flex items-center justify-between text-xs">'+
+        '<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:'+dColors[i]+'"></span><span>'+l+'</span></div>'+
+        '<span class="font-semibold">'+fmtK(dVals[i])+'원 ('+pct+'%)</span></div>';
+    }).join('');
+  }
+
+  // 바 차트 (카테고리)
+  if(charts.bar) charts.bar.destroy();
+  var bCtx = document.getElementById('c-bar');
+  if(bCtx){
+    var catMap={};
+    txs.filter(function(t){return t.type==='지출';}).forEach(function(t){catMap[t.cat]=(catMap[t.cat]||0)+t.amt;});
+    D.fixed.forEach(function(f){catMap[f.cat]=(catMap[f.cat]||0)+f.amt;});
+    var sorted=Object.entries(catMap).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+    charts.bar = new Chart(bCtx.getContext('2d'),{
+      type:'bar',
+      data:{labels:sorted.map(function(e){return e[0].replace(/^\S+ /,'').slice(0,5);}),datasets:[{data:sorted.map(function(e){return e[1];}),backgroundColor:'#6366F1',borderRadius:5,borderSkipped:false}]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmt(c.raw);}}}},scales:{x:{grid:{color:'#F1F0EC'},border:{display:false},ticks:{font:{size:10},callback:function(v){return fmtK(v)+'만';}}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:11}}}}}
+    });
+  }
+
+  // 거래내역
+  renderTxs();
+}
+
+/* ════════════════════════════════════════════════
+   8. 거래내역 렌더 (대시보드용)
+═══════════════════════════════════════════════════ */
+var CAT_BG={'🍽️ 식비':'#E1F5EE','🚇 교통':'#E6F1FB','⛽ 주유':'#FEF3C7','🛵 배달':'#FFEDD5','🍜 외식':'#FEE2E2','🛒 마트/편의':'#EDE9FE','☕ 카페':'#FDF2F8','💊 의료':'#F0FDF4','👕 의류':'#EFF6FF','🎬 문화/여가':'#FFF7ED','✈️ 여행':'#EFF6FF','🎁 경조사':'#FDF4FF','💼 월급':'#ECFDF5','💎 보너스':'#FFFBEB','📈 투자수익':'#F0FDF4','📌 기타':'#F9FAFB'};
+function renderTxs(){
+  var txs = getMonthTxs().reverse();
+  var isMob = window.innerWidth < 768;
+  var exp = txs.filter(function(t){return t.type==='지출';}).reduce(function(a,t){return a+t.amt;},0);
+  var inc2 = txs.filter(function(t){return t.type==='수입';}).reduce(function(a,t){return a+t.amt;},0);
+
+  // 모바일 카드
+  var cList = document.getElementById('tx-cards');
+  if(cList){
+    cList.style.display = isMob?'':'none';
+    if(isMob){
+      cList.innerHTML = txs.length?txs.slice(0,20).map(function(t){
+        var bg = CAT_BG[t.cat]||'#F9FAFB';
+        var em = (t.cat.match(/^\S+/)||['📌'])[0];
+        var isInc = t.type==='수입'; var isSav = t.type==='저축';
+        var amtColor = isInc?'#059669':isSav?'#2563EB':'#DC2626';
+        var sign = isInc?'+':isSav?'저축-':'-';
+        return '<div class="tx-item">'+
+          '<div class="tx-icon" style="background:'+bg+'">'+em+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(t.content)+'</div>'+
+            '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">'+
+              '<span>'+esc(t.date?t.date.slice(5):'')+'</span>'+
+              (t.cat?'<span style="background:#F3F4F6;padding:1px 6px;border-radius:8px;">'+esc(t.cat.replace(/^\S+ /,''))+'</span>':'')+
+              (t.pay?'<span>💳 '+esc(t.pay)+'</span>':'')+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">'+
+            '<span style="font-size:15px;font-weight:700;color:'+amtColor+';">'+sign+fmt(t.amt)+'</span>'+
+            '<div style="display:flex;gap:8px;">'+
+              '<button style="font-size:11px;color:#3B82F6;" onclick="editTx('+t.id+')">수정</button>'+
+              '<button style="font-size:11px;color:#EF4444;" onclick="delTx('+t.id+')">삭제</button>'+
+            '</div>'+
+          '</div></div>';
+      }).join('')+'<div style="text-align:center;padding:10px 0;"><button onclick="switchView(\'ledger\')" style="font-size:12px;color:#6B7280;">전체 거래내역 보기 →</button></div>':
+      '<div class="empty-state"><div class="icon">📭</div><div style="font-size:14px;font-weight:500;color:#374151;">이번달 거래가 없어요</div><div style="font-size:12px;color:#9CA3AF;margin-top:4px;">우측 하단 + 버튼으로 추가하세요</div></div>';
+    }
+  }
+
+  // PC 테이블
+  var tb = document.getElementById('tx-tbody');
+  if(tb){
+    var wrap = tb.closest('.overflow-x-auto');
+    if(wrap) wrap.style.display = isMob?'none':'';
+    tb.innerHTML = txs.length?txs.slice(0,20).map(function(t){
+      var isInc=t.type==='수입';
+      return '<tr>'+
+        '<td class="text-muted">'+esc(t.date||'')+'</td>'+
+        '<td class="font-medium">'+esc(t.content||'')+'</td>'+
+        '<td><span class="badge '+(isInc?'text-inc bg-emerald-50':'t.type==="저축"?"text-blue-600 bg-blue-50":"text-exp bg-red-50"')+'">'+esc(t.type)+'</span></td>'+
+        '<td class="text-xs">'+esc(t.cat||'')+'</td>'+
+        '<td class="text-xs">'+esc(t.who||'')+'</td>'+
+        '<td class="text-xs">'+(t.pay?'💳 '+esc(t.pay):'')+'</td>'+
+        '<td class="text-right font-semibold '+(isInc?'text-inc':'text-exp')+'">'+(isInc?'+':'-')+fmt(t.amt)+'</td>'+
+        '<td class="whitespace-nowrap">'+
+          '<button class="text-xs text-blue-500 hover:underline mr-2" onclick="editTx('+t.id+')">수정</button>'+
+          '<button class="text-xs text-red-500 hover:underline" onclick="delTx('+t.id+')">삭제</button>'+
+        '</td></tr>';
+    }).join(''):'<tr><td colspan="8" class="text-center py-8 text-muted">이번달 거래내역이 없어요</td></tr>';
+  }
+
+  var sumEl = document.getElementById('tx-sum');
+  if(sumEl) sumEl.innerHTML = '지출 <strong class="text-exp">'+fmt(exp)+'</strong> &nbsp; 수입 <strong class="text-inc">'+fmt(inc2)+'</strong>';
+}
+
+/* ════════════════════════════════════════════════
+   9. 가계부 입력 탭
+═══════════════════════════════════════════════════ */
+function renderLedger(){
+  var filt = document.getElementById('filt-type');
+  var filtVal = filt ? filt.value : '';
+  var txs = getMonthTxs().filter(function(t){ return !filtVal || t.type===filtVal; }).reverse();
+  var expTot = txs.filter(function(t){return t.type==='지출';}).reduce(function(a,t){return a+t.amt;},0);
+
+  var tb = document.getElementById('ledger-tbody');
+  if(!tb) return;
+  tb.innerHTML = txs.length?txs.map(function(t){
+    var isInc=t.type==='수입';
+    return '<tr>'+
+      '<td class="text-muted text-xs">'+esc(t.date||'')+'</td>'+
+      '<td class="font-medium">'+esc(t.content||'')+'</td>'+
+      '<td><span class="badge '+(isInc?'text-inc':'text-exp')+'" style="background:'+(isInc?'#ECFDF5':'#FEF2F2')+'">'+esc(t.type)+'</span></td>'+
+      '<td class="text-xs">'+esc(t.cat||'')+'</td>'+
+      '<td class="text-xs">'+esc(t.who||'')+'</td>'+
+      '<td class="text-xs">'+(t.pay?'💳 '+esc(t.pay):'')+'</td>'+
+      '<td class="text-right font-semibold '+(isInc?'text-inc':'text-exp')+'">'+(isInc?'+':'-')+fmt(t.amt)+'</td>'+
+      '<td class="whitespace-nowrap">'+
+        '<button class="text-xs text-blue-500 hover:underline mr-2" onclick="editTx('+t.id+')">수정</button>'+
+        '<button class="text-xs text-red-500 hover:underline" onclick="delTx('+t.id+')">삭제</button>'+
+      '</td></tr>';
+  }).join(''):'<tr><td colspan="8" class="text-center py-10 text-muted">거래내역이 없어요. 위에서 추가해보세요!</td></tr>';
+
+  var ls = document.getElementById('ledger-sum');
+  if(ls) ls.textContent = fmt(expTot);
+}
+
+/* ════════════════════════════════════════════════
+   10. 고정지출 렌더
+═══════════════════════════════════════════════════ */
+function renderFixed(){
+  var tot = D.fixed.reduce(function(a,f){return a+f.amt;},0);
+
+  // 목록
+  var tb = document.getElementById('fx-tbody');
+  if(tb) tb.innerHTML = D.fixed.length?D.fixed.map(function(f){
+    return '<tr>'+
+      '<td class="font-medium">'+esc(f.name)+'</td>'+
+      '<td class="text-xs">'+esc(f.cat||'')+'</td>'+
+      '<td class="text-xs">'+(f.card?'<span class="badge text-blue-700 bg-blue-50">💳 '+esc(f.card)+'</span>':'')+'</td>'+
+      '<td class="text-xs text-muted">'+(f.due?'매월 '+f.due+'일':'-')+'</td>'+
+      '<td class="text-right font-semibold text-exp">'+fmt(f.amt)+'</td>'+
+      '<td class="whitespace-nowrap">'+
+        '<button class="text-xs text-blue-500 hover:underline mr-2" onclick="editFixed('+f.id+')">수정</button>'+
+        '<button class="text-xs text-red-500 hover:underline" onclick="delFixed('+f.id+')">삭제</button>'+
+      '</td></tr>';
+  }).join(''):'<tr><td colspan="6" class="text-center py-8 text-muted">고정지출을 추가해주세요</td></tr>';
+
+  var ft = document.getElementById('fx-total');
+  if(ft) ft.textContent = fmt(tot);
+
+  // 카드별 뷰
+  var cmap = {};
+  D.fixed.forEach(function(f){ var k=f.card||'미연결'; if(!cmap[k])cmap[k]=[]; cmap[k].push(f); });
+  var cv = document.getElementById('fx-card-view');
+  if(cv){
+    cv.innerHTML = Object.entries(cmap).map(function(e){
+      var card=e[0], items=e[1];
+      var sub=items.reduce(function(a,f){return a+f.amt;},0);
+      return '<div class="bg-white rounded-2xl border border-border overflow-hidden mb-3">'+
+        '<div class="flex items-center justify-between px-4 py-3 border-b border-border bg-soft">'+
+          '<span class="font-semibold text-sm">💳 '+esc(card)+'</span>'+
+          '<span class="font-bold text-exp text-sm">'+fmt(sub)+'</span></div>'+
+        items.map(function(f){
+          return '<div class="flex items-center justify-between px-4 py-2.5 border-b border-border last:border-0 text-sm">'+
+            '<div><span class="font-medium">'+esc(f.name)+'</span>'+(f.due?' <span class="text-xs text-muted">'+f.due+'일</span>':'')+'</div>'+
+            '<div class="flex items-center gap-3">'+
+              '<span class="font-semibold text-exp">'+fmt(f.amt)+'</span>'+
+              '<button class="text-xs text-blue-500 hover:underline" onclick="editFixed('+f.id+')">수정</button>'+
+              '<button class="text-xs text-red-500 hover:underline" onclick="delFixed('+f.id+')">삭제</button>'+
+            '</div></div>';
+        }).join('')+'</div>';
+    }).join('');
+  }
+}
+
+/* ════════════════════════════════════════════════
+   11. 대출/자산 렌더
+═══════════════════════════════════════════════════ */
+function renderLoan(){
+  var totBal=0,totCur=0,totPrin=0,totInt=0;
+  var tb = document.getElementById('ln-tbody');
+  if(tb) tb.innerHTML = D.loans.length?D.loans.map(function(l){
+    var cur=calcLoanBal(l), mo=elapsedMo(l), red=l.bal-cur;
+    totBal+=l.bal; totCur+=cur; totPrin+=l.prin; totInt+=l.int;
+    return '<tr>'+
+      '<td class="font-medium">'+esc(l.name)+'</td>'+
+      '<td class="text-right text-muted text-xs">'+fmt(l.bal)+'</td>'+
+      '<td class="text-right font-semibold text-exp">'+fmt(cur)+(red>0?'<div class="text-xs text-inc">↓'+fmt(red)+' 차감</div>':'')+(l.prin===0?'<div class="text-xs text-muted">이자만</div>':'')+'</td>'+
+      '<td class="text-right text-xs">'+fmt(l.prin)+'</td>'+
+      '<td class="text-right text-xs text-muted">'+fmt(l.int)+'</td>'+
+      '<td class="text-center text-xs text-muted">'+(l.due?'매월 '+l.due+'일':'-')+'</td>'+
+      '<td class="text-xs text-muted">'+(l.prin?mo+'개월':'수동')+'</td>'+
+      '<td class="whitespace-nowrap">'+
+        '<button class="text-xs text-blue-500 hover:underline mr-2" onclick="editLoan('+l.id+')">수정</button>'+
+        '<button class="text-xs text-red-500 hover:underline" onclick="delLoan('+l.id+')">삭제</button>'+
+      '</td></tr>';
+  }).join(''):'<tr><td colspan="8" class="text-center py-8 text-muted">대출을 추가해주세요</td></tr>';
+
+  function setTxt(id,v){ var el=document.getElementById(id); if(el)el.textContent=fmt(v); }
+  setTxt('ln-t-bal',totBal); setTxt('ln-t-cur',totCur); setTxt('ln-t-prin',totPrin); setTxt('ln-t-int',totInt);
+
+  // KPI
+  var assetTot=D.assets.reduce(function(a,x){return a+x.amt;},0);
+  var net=assetTot-totCur;
+  var ki=document.getElementById('loan-kpi');
+  if(ki) ki.innerHTML=[
+    {l:'총 대출잔액',v:fmt(totBal),c:'text-exp',i:'fa-credit-card'},
+    {l:'월 총상환액',v:fmt(totPrin+totInt),c:'text-loan',i:'fa-arrow-up'},
+    {l:'순자산',v:(net>=0?'+':'')+fmt(net),c:net>=0?'text-inc':'text-exp',i:'fa-scale-balanced'},
+  ].map(function(k){
+    return '<div class="kpi"><div class="text-xs font-bold text-muted uppercase tracking-widest mb-2">'+k.l+'</div>'+
+      '<div class="kpi-val '+k.c+'"><i class="fa-solid '+k.i+' text-sm mr-1"></i>'+k.v+'</div></div>';
+  }).join('');
+
+  // 자산
+  var assetTot2=0;
+  var atb=document.getElementById('as-tbody');
+  if(atb) atb.innerHTML=D.assets.length?D.assets.map(function(x){
+    assetTot2+=x.amt;
+    return '<tr>'+
+      '<td class="font-medium">'+esc(x.name)+'</td>'+
+      '<td class="text-xs"><span class="badge text-muted bg-slate-50">'+esc(x.type)+'</span></td>'+
+      '<td class="text-right font-semibold text-inc">'+fmt(x.amt)+'</td>'+
+      '<td class="text-xs text-muted">'+esc(x.memo||'')+'</td>'+
+      '<td class="whitespace-nowrap">'+
+        '<button class="text-xs text-blue-500 hover:underline mr-2" onclick="editAsset('+x.id+')">수정</button>'+
+        '<button class="text-xs text-red-500 hover:underline" onclick="delAsset('+x.id+')">삭제</button>'+
+      '</td></tr>';
+  }).join(''):'<tr><td colspan="5" class="text-center py-8 text-muted">자산을 추가해주세요</td></tr>';
+  var at=document.getElementById('as-total'); if(at) at.textContent=fmt(assetTot2);
+}
+
+/* ════════════════════════════════════════════════
+   12. 연간 추이
+═══════════════════════════════════════════════════ */
+function renderTrend(){
+  var curY = state.month.slice(0,4);
+  var titleEl = document.getElementById('trend-title');
+  if(titleEl) titleEl.textContent = curY+'년 월별 지출 추이';
+  var fixedTot = D.fixed.reduce(function(a,f){return a+f.amt;},0);
+  var loanPay = D.loans.reduce(function(a,l){return a+l.prin+l.int;},0);
+
+  var varArr=[], incArr=[], totArr=[];
+  MONTHS.forEach(function(m){
+    var txs=getMonthTxs(m);
+    var v=txs.filter(function(t){return t.type==='지출';}).reduce(function(a,t){return a+t.amt;},0);
+    var i2=txs.filter(function(t){return t.type==='수입';}).reduce(function(a,t){return a+t.amt;},0);
+    varArr.push(v); incArr.push(i2); totArr.push(v+fixedTot+loanPay);
+  });
+
+  if(charts.trend) charts.trend.destroy();
+  var ctx=document.getElementById('c-trend');
+  if(ctx) charts.trend=new Chart(ctx.getContext('2d'),{
+    type:'bar',
+    data:{labels:MNAMES,datasets:[
+      {label:'고정지출',data:MONTHS.map(function(){return fixedTot;}),backgroundColor:'#C7D2FE',borderRadius:3,stack:'s'},
+      {label:'변동지출',data:varArr,backgroundColor:'#FDE68A',borderRadius:3,stack:'s'},
+      {label:'대출상환',data:MONTHS.map(function(){return loanPay;}),backgroundColor:'#FCA5A5',borderRadius:3,stack:'s'},
+      {label:'수입',data:incArr,type:'line',borderColor:'#10B981',backgroundColor:'transparent',pointBackgroundColor:'#10B981',pointRadius:3,borderWidth:2,tension:.3,order:0},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:14,usePointStyle:true}}},
+      scales:{x:{stacked:true,grid:{display:false},border:{display:false},ticks:{font:{size:11}}},y:{stacked:true,grid:{color:'#F3F2EF'},border:{display:false},ticks:{font:{size:10},callback:function(v){return Math.round(v/10000)+'만';}}}}}
+  });
+
+  // 테이블
+  var tb=document.getElementById('trend-tbody');
+  if(tb) tb.innerHTML=MONTHS.map(function(m,i){
+    var txs=getMonthTxs(m);
+    var v=txs.filter(function(t){return t.type==='지출';}).reduce(function(a,t){return a+t.amt;},0);
+    var inc3=txs.filter(function(t){return t.type==='수입';}).reduce(function(a,t){return a+t.amt;},0);
+    var tot=v+fixedTot+loanPay;
+    return '<tr style="'+(m===state.month?'background:#FEFCE8;font-weight:700;':'')+'">'+
+      '<td>'+MNAMES[i]+'</td>'+
+      '<td class="text-right text-indigo-600">'+fmtK(fixedTot)+'만</td>'+
+      '<td class="text-right text-amber-600">'+fmtK(v)+'만</td>'+
+      '<td class="text-right text-red-500">'+fmtK(loanPay)+'만</td>'+
+      '<td class="text-right text-inc">'+fmtK(inc3)+'만</td>'+
+      '<td class="text-right font-bold">'+fmtK(tot)+'만</td>'+
+      '</tr>';
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════
+   13. ADD 핸들러
+═══════════════════════════════════════════════════ */
+function openAdd(){
+  switchView('ledger');
+  var el=document.getElementById('f-content'); if(el){el.focus();}
+}
+function submitTx(){
+  var c=document.getElementById('f-content').value.trim();
+  var a=parseNum(document.getElementById('f-amt').value);
+  var dt=document.getElementById('f-date').value;
+  if(!c||!a||!dt){alert('내용, 날짜, 금액은 필수입니다.');return;}
+  D.txs.push({
+    id:nextId(),content:c,date:dt,
+    type:document.getElementById('f-type').value,
+    cat:document.getElementById('f-cat').value,
+    who:document.getElementById('f-who').value,
+    pay:document.getElementById('f-pay').value,
+    amt:a
+  });
+  saveData('txs');
+  // 입력 초기화
+  document.getElementById('f-content').value='';
+  document.getElementById('f-amt').value='';
+  renderAll();
+}
+
+function addFixed(){
+  var n=document.getElementById('fx-name').value.trim();
+  var a=parseNum(document.getElementById('fx-amt').value);
+  if(!n||!a){alert('항목명과 금액은 필수입니다.');return;}
+  D.fixed.push({id:nextId(),name:n,cat:document.getElementById('fx-cat').value,card:document.getElementById('fx-card').value,due:document.getElementById('fx-due').value,amt:a});
+  saveData('fixed');
+  ['fx-name','fx-amt'].forEach(function(i){var el=document.getElementById(i);if(el)el.value='';});
+  document.getElementById('fx-due').value='';
+  renderAll();
+}
+
+function addLoan(){
+  var n=document.getElementById('ln-name').value.trim();
+  var b=parseNum(document.getElementById('ln-bal').value);
+  if(!n||!b){alert('대출명과 잔액은 필수입니다.');return;}
+  var now=new Date();
+  D.loans.push({id:nextId(),name:n,bal:b,prin:parseNum(document.getElementById('ln-prin').value),int:parseNum(document.getElementById('ln-int').value),due:document.getElementById('ln-due').value,startYM:now.getFullYear()+'-'+(now.getMonth()<9?'0':'')+(now.getMonth()+1)});
+  saveData('loans');
+  ['ln-name','ln-bal','ln-prin','ln-int'].forEach(function(i){var el=document.getElementById(i);if(el)el.value='';});
+  renderAll();
+}
+
+function addAsset(){
+  var n=document.getElementById('as-name').value.trim();
+  var a=parseNum(document.getElementById('as-amt').value);
+  if(!n||!a){alert('자산명과 금액은 필수입니다.');return;}
+  D.assets.push({id:nextId(),name:n,type:document.getElementById('as-type').value,amt:a,memo:document.getElementById('as-memo').value});
+  saveData('assets');
+  ['as-name','as-amt','as-memo'].forEach(function(i){var el=document.getElementById(i);if(el)el.value='';});
+  renderAll();
+}
+
+/* ════════════════════════════════════════════════
+   14. 수정/삭제 — 모달
+═══════════════════════════════════════════════════ */
+var _editCtx = null;
+
+function openModal(title, fieldsHTML, onSave, onDel){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = fieldsHTML;
+  document.getElementById('modal-body').querySelectorAll('.num').forEach(numify);
+  document.getElementById('modal-save').onclick = onSave;
+  document.getElementById('modal-del').onclick = onDel;
+  document.getElementById('modal-bg').classList.remove('hidden');
+}
+function closeModal(){ document.getElementById('modal-bg').classList.add('hidden'); _editCtx=null; }
+document.getElementById('modal-bg').addEventListener('click',function(e){ if(e.target===this)closeModal(); });
+
+function mField(label,id,type,val,extra){
+  extra=extra||'';
+  return '<div class="mb-3"><label class="text-xs font-semibold text-muted block mb-1">'+label+'</label>'+
+    '<input type="'+(type||'text')+'" id="'+id+'" class="finput'+(type==='number'?' num':'')+'" value="'+esc(String(val||''))+'">'+extra+'</div>';
+}
+function mSelect(label,id,opts,val){
+  return '<div class="mb-3"><label class="text-xs font-semibold text-muted block mb-1">'+label+'</label>'+
+    '<select id="'+id+'" class="finput">'+opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select></div>';
+}
+
+// 거래 수정
+function editTx(id){
+  var t = D.txs.find(function(x){return x.id===id;}); if(!t)return;
+  var cardOpts = [''].concat(D.cards.map(function(c){return c.name;}));
+  openModal('거래 수정',
+    mField('내용','m-content','text',t.content)+
+    mField('날짜','m-date','date',t.date)+
+    mSelect('분류','m-type',['지출','수입','저축'],t.type)+
+    mSelect('카테고리','m-cat',D.cats,t.cat)+
+    mField('금액 (원)','m-amt','number',t.amt)+
+    mSelect('누가','m-who',['아내','남편','공동'],t.who)+
+    mSelect('결제수단','m-pay',cardOpts,t.pay||''),
+    function(){
+      t.content=document.getElementById('m-content').value;
+      t.date=document.getElementById('m-date').value;
+      t.type=document.getElementById('m-type').value;
+      t.cat=document.getElementById('m-cat').value;
+      t.amt=parseNum(document.getElementById('m-amt').value);
+      t.who=document.getElementById('m-who').value;
+      t.pay=document.getElementById('m-pay').value;
+      saveData('txs'); closeModal(); renderAll();
+    },
+    function(){if(confirm('삭제할까요?')){D.txs=D.txs.filter(function(x){return x.id!==id;});saveData('txs');closeModal();renderAll();}}
+  );
+}
+function delTx(id){if(confirm('삭제할까요?')){D.txs=D.txs.filter(function(x){return x.id!==id;});saveData('txs');renderAll();}}
+
+// 고정지출 수정
+function editFixed(id){
+  var f = D.fixed.find(function(x){return x.id===id;}); if(!f)return;
+  var cats=['📺 구독','📱 통신','🏥 보험','🏠 주거','🚗 교통','🏦 금융','📌 기타'];
+  var dueOpts=[''].concat(Array.from({length:31},function(_,i){return String(i+1);}));
+  var cardOpts=[''].concat(D.cards.map(function(c){return c.name;}));
+  openModal('고정지출 수정',
+    mField('항목명','m-name','text',f.name)+
+    mSelect('카테고리','m-cat',cats,f.cat)+
+    mSelect('결제카드','m-card',cardOpts,f.card||'')+
+    mSelect('결제일','m-due',dueOpts,f.due||'')+
+    mField('금액 (원)','m-amt','number',f.amt),
+    function(){
+      f.name=document.getElementById('m-name').value;
+      f.cat=document.getElementById('m-cat').value;
+      f.card=document.getElementById('m-card').value;
+      f.due=document.getElementById('m-due').value;
+      f.amt=parseNum(document.getElementById('m-amt').value);
+      saveData('fixed'); closeModal(); renderAll();
+    },
+    function(){if(confirm('삭제할까요?')){D.fixed=D.fixed.filter(function(x){return x.id!==id;});saveData('fixed');closeModal();renderAll();}}
+  );
+}
+function delFixed(id){if(confirm('삭제할까요?')){D.fixed=D.fixed.filter(function(x){return x.id!==id;});saveData('fixed');renderAll();}}
+
+// 대출 수정
+function editLoan(id){
+  var l = D.loans.find(function(x){return x.id===id;}); if(!l)return;
+  var dueOpts=[''].concat(Array.from({length:31},function(_,i){return String(i+1);}));
+  openModal('대출 수정',
+    mField('대출명','m-name','text',l.name)+
+    mField('잔액 (원)','m-bal','number',l.bal)+
+    mField('월 원금 (0=이자만)','m-prin','number',l.prin)+
+    mField('월 이자','m-int','number',l.int)+
+    mSelect('납입일','m-due',dueOpts,l.due||''),
+    function(){
+      l.name=document.getElementById('m-name').value;
+      l.bal=parseNum(document.getElementById('m-bal').value);
+      l.prin=parseNum(document.getElementById('m-prin').value);
+      l.int=parseNum(document.getElementById('m-int').value);
+      l.due=document.getElementById('m-due').value;
+      saveData('loans'); closeModal(); renderAll();
+    },
+    function(){if(confirm('삭제할까요?')){D.loans=D.loans.filter(function(x){return x.id!==id;});saveData('loans');closeModal();renderAll();}}
+  );
+}
+function delLoan(id){if(confirm('삭제할까요?')){D.loans=D.loans.filter(function(x){return x.id!==id;});saveData('loans');renderAll();}}
+
+// 자산 수정
+function editAsset(id){
+  var x = D.assets.find(function(a){return a.id===id;}); if(!x)return;
+  var types=['🏠 부동산','🚗 자동차','💰 예금/적금','📈 투자','🔑 보증금','🛡 보험','📌 기타'];
+  openModal('자산 수정',
+    mField('자산명','m-name','text',x.name)+
+    mSelect('종류','m-type',types,x.type)+
+    mField('금액 (원)','m-amt','number',x.amt)+
+    mField('비고','m-memo','text',x.memo),
+    function(){
+      x.name=document.getElementById('m-name').value;
+      x.type=document.getElementById('m-type').value;
+      x.amt=parseNum(document.getElementById('m-amt').value);
+      x.memo=document.getElementById('m-memo').value;
+      saveData('assets'); closeModal(); renderAll();
+    },
+    function(){if(confirm('삭제할까요?')){D.assets=D.assets.filter(function(a){return a.id!==id;});saveData('assets');closeModal();renderAll();}}
+  );
+}
+function delAsset(id){if(confirm('삭제할까요?')){D.assets=D.assets.filter(function(x){return x.id!==id;});saveData('assets');renderAll();}}
+
+/* ════════════════════════════════════════════════
+   15. 뷰 전환
+═══════════════════════════════════════════════════ */
+function switchView(v){
+  state.view=v;
+  ['dash','ledger','fixed','loan','trend'].forEach(function(id){
+    var el=document.getElementById('v-'+id);
+    if(el) el.classList.toggle('hidden',id!==v);
+  });
+  document.querySelectorAll('.sb-item').forEach(function(el){
+    el.classList.toggle('active',el.dataset.v===v);
+  });
+  document.querySelectorAll('.bnav').forEach(function(el){
+    el.classList.toggle('active',el.dataset.v===v);
+  });
+  if(v==='trend') renderTrend();
+  else if(v==='loan') renderLoan();
+  else if(v==='fixed') renderFixed();
+  else if(v==='ledger') renderLedger();
+}
+
+/* ════════════════════════════════════════════════
+   16. 전체 렌더
+═══════════════════════════════════════════════════ */
+function renderAll(){
+  renderMonthNav();
+  fillSelects();
+  renderDash();
+  if(state.view==='ledger') renderLedger();
+  else if(state.view==='fixed') renderFixed();
+  else if(state.view==='loan') renderLoan();
+  else if(state.view==='trend') renderTrend();
+}
+
+/* ════════════════════════════════════════════════
+   17. 엑셀 내보내기
+═══════════════════════════════════════════════════ */
+function exportExcel(target){
+  var wb=XLSX.utils.book_new();
+  var m=state.month;
+
+  if(!target||target==='tx'){
+    var txs=getMonthTxs();
+    var rows=[['날짜','내용','분류','카테고리','누가','결제수단','금액']].concat(txs.map(function(t){return[t.date,t.content,t.type,t.cat,t.who,t.pay||'',t.amt];}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),m+'_거래내역');
+  }
+  if(!target){
+    var frows=[['항목명','카테고리','결제카드','결제일','금액']].concat(D.fixed.map(function(f){return[f.name,f.cat,f.card||'',f.due||'',f.amt];}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(frows),'고정지출');
+
+    var lrows=[['대출명','잔액','추정잔액','월원금','월이자','납입일']].concat(D.loans.map(function(l){return[l.name,l.bal,calcLoanBal(l),l.prin,l.int,l.due?'매월 '+l.due+'일':''];}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lrows),'대출현황');
+
+    var arows=[['자산명','종류','금액','비고']].concat(D.assets.map(function(x){return[x.name,x.type,x.amt,x.memo||''];}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(arows),'자산현황');
+
+    var fixedTot=D.fixed.reduce(function(a,f){return a+f.amt;},0);
+    var loanPay=D.loans.reduce(function(a,l){return a+l.prin+l.int;},0);
+    var srows=[['월','고정지출','변동지출','대출상환','수입','총지출']];
+    getMonthsOfYear(state.month.slice(0,4)).forEach(function(mo,i){
+      var txs2=getMonthTxs(mo);
+      var v=txs2.filter(function(t){return t.type==='지출';}).reduce(function(a,t){return a+t.amt;},0);
+      var i2=txs2.filter(function(t){return t.type==='수입';}).reduce(function(a,t){return a+t.amt;},0);
+      srows.push([MNAMES[i],fixedTot,v,loanPay,i2,v+fixedTot+loanPay]);
+    });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(srows),'연간요약');
+  }
+  XLSX.writeFile(wb,'쬬쀼_가계부_'+m+(target?'_거래내역':'')+'.xlsx');
+}
+
+function setDefaultDate(){
+  var n=new Date();
+  var s=n.getFullYear()+'-'+(n.getMonth()<9?'0':'')+(n.getMonth()+1)+'-'+(n.getDate()<10?'0':'')+n.getDate();
+  var el=document.getElementById('f-date'); if(el) el.value=s;
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',function(){setDefaultDate();init();});
+}else{
+  setDefaultDate();init();
+}
+</script>
+</body>
+</html>
