@@ -14,6 +14,8 @@ tailwind.config={theme:{extend:{colors:{ink:'#111827',soft:'#F9F8F5',card:'#FFFF
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
+/* Tailwind CDN 로딩 지연/실패에 대비한 안전장치 — 직접 정의 (모바일 전용 표시 요소는 예외) */
+.hidden:not(#bot-nav):not(.quick-btn){display:none!important;}
 body{font-family:'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;background:#F9F8F5;color:#111827;overflow-x:hidden;}
 html{height:100%;}
 #app{height:100vh;}
@@ -23,7 +25,71 @@ html{height:100%;}
 
 /* SIDEBAR */
 #sidebar{width:200px;flex-shrink:0;}
-@media(max-width:767px){#sidebar{display:none;}#bot-nav{display:flex;}#main{margin-bottom:68px;}}
+@media(max-width:767px){
+  #sidebar{display:none;}
+  #bot-nav{display:flex;}
+  #main{margin-bottom:68px;}
+
+  /* 본문 기본 글씨 키우기 */
+  body{font-size:15px;}
+
+  /* 표가 화면보다 넓어져서 페이지 전체가 밀리는 것 방지 */
+  .mobile-hide-col{display:none!important;}
+  .tbl{min-width:0!important;width:100%;}
+  .overflow-x-auto{overflow-x:auto;max-width:100%;}
+
+  /* 섹션 제목 */
+  .text-xs.font-bold.text-muted.uppercase{font-size:12px!important;letter-spacing:.03em!important;}
+
+  /* 작은 글씨 전역 키우기 (text-xs는 보통 카테고리/메타정보) */
+  .text-xs{font-size:12px!important;}
+  .text-xs.text-muted{font-size:11px!important;}
+
+  /* 대출 탭 KPI 3열 — 모바일에서 좁아지지 않게 */
+  #loan-kpi .kpi{padding:10px 8px;}
+  #loan-kpi .kpi-val{font-size:clamp(13px,4vw,18px)!important;}
+  #loan-kpi .kpi .text-xs{font-size:9.5px!important;letter-spacing:0!important;}
+
+  /* 테이블 — 모바일에서도 읽히게 */
+  .tbl{font-size:14px;min-width:0!important;}
+  .tbl th{font-size:11px!important;padding:9px 8px;}
+  .tbl td{font-size:14px;padding:11px 8px;}
+
+  /* 라벨(입력폼) */
+  label{font-size:12px!important;}
+
+  /* 입력창 */
+  .finput{font-size:16px;padding:11px 12px;}
+
+  /* KPI 카드 숫자 더 크게 */
+  .kpi-val{font-size:clamp(19px,5vw,26px)!important;}
+
+  /* 뱃지 */
+  .badge{font-size:11px;padding:3px 9px;}
+
+  /* 차트 영역 — 더 크게, 여백 확보 */
+  #c-donut, #c-bar{ }
+  .chart-wrap-donut{height:230px!important;}
+  .chart-wrap-bar{height:280px!important;}
+  .chart-wrap-trend{height:300px!important;}
+
+  /* 도넛 범례 글씨 */
+  #donut-leg .text-xs{font-size:13px!important;}
+  #donut-leg .font-semibold{font-size:13px!important;}
+
+  /* 거래 카드 리스트 */
+  .tx-item .tx-name, .tx-item div[style*="font-size:14px"]{font-size:15px!important;}
+  .tx-item div[style*="font-size:11px"]{font-size:12px!important;}
+  .tx-item span[style*="font-size:15px"]{font-size:16px!important;}
+
+  /* 모달 입력 폼 */
+  .modal-box label{font-size:12px!important;}
+  .modal-box input, .modal-box select{font-size:16px!important;padding:11px 12px!important;}
+
+  /* 하단 네비 글씨 */
+  .bnav{font-size:11px;}
+  .bnav i{font-size:18px!important;}
+}
 @media(min-width:768px){#bot-nav{display:none;}}
 
 /* NAV ACTIVE */
@@ -43,15 +109,21 @@ html{height:100%;}
 
 /* TABLE */
 .tbl{width:100%;border-collapse:collapse;font-size:13px;}
+@media(min-width:768px){.tbl{min-width:560px;}}
 .tbl th{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;border-bottom:1px solid #E5E2DA;white-space:nowrap;text-align:left;}
-.tbl td{padding:10px 12px;border-bottom:1px solid #F9F8F5;vertical-align:middle;}
+.tbl td{padding:10px 12px;border-bottom:1px solid #F9F8F5;vertical-align:middle;white-space:nowrap;}
 .tbl tbody tr:last-child td{border-bottom:none;}
 .tbl tbody tr:hover td{background:#FAFAF8;}
-.tbl tfoot td{padding:10px 12px;background:#F9F8F5;border-top:2px solid #E5E2DA;font-weight:700;font-size:13px;}
+.tbl tfoot td{padding:10px 12px;background:#F9F8F5;border-top:2px solid #E5E2DA;font-weight:700;font-size:13px;white-space:nowrap;}
+/* 카드/페이지 컨테이너가 화면보다 넓어지지 않도록 (가로 스크롤 버그 방지) */
+.overflow-x-auto{min-width:0;-webkit-overflow-scrolling:touch;}
+main, .page, #main{min-width:0;max-width:100%;}
+main *{box-sizing:border-box;}
 
 /* MODAL */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end;justify-content:center;}
-@media(min-width:640px){.modal-bg{align-items:center;}}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;}
+.modal-bg.show{display:flex;}
+@media(min-width:640px){.modal-bg.show{align-items:center;}}
 .modal-box{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
 @media(min-width:640px){.modal-box{border-radius:16px;}}
 
@@ -74,19 +146,6 @@ html{height:100%;}
 .tx-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F3F2EF;}
 .tx-item:last-child{border-bottom:none;}
 .tx-icon{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
-
-/* MOBILE QUICK INPUT SHEET */
-.quick-btn{
-  position:fixed;bottom:76px;right:16px;z-index:150;
-  width:52px;height:52px;border-radius:50%;
-  background:#111827;color:#fff;border:none;
-  font-size:22px;cursor:pointer;
-  box-shadow:0 4px 16px rgba(0,0,0,.25);
-  display:flex;align-items:center;justify-content:center;
-  transition:transform .15s;
-}
-.quick-btn:active{transform:scale(.92);}
-@media(min-width:768px){.quick-btn{display:none;}}
 
 /* MOBILE CARD SECTION */
 .mob-section{background:#fff;border-radius:18px;overflow:hidden;border:1px solid #E5E2DA;margin-bottom:12px;}
@@ -152,17 +211,17 @@ html{height:100%;}
   </header>
 
   <!-- ── 대시보드 ── -->
-  <div id="v-dash" style="padding:14px;" class="md:p-6 space-y-4">
+  <div id="v-dash" class="md:p-6 space-y-4" style="padding:14px;">
     <div class="kpi-row" id="kpi-wrap"></div>
-    <div style="display:grid;grid-template-columns:1fr;gap:12px;" class="md:grid-cols-5 md:grid">
-      <div class="md:col-span-2 bg-white rounded-2xl border border-border p-4">
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;min-width:0;" class="md:grid-cols-5 md:grid">
+      <div class="md:col-span-2 bg-white rounded-2xl border border-border p-4" style="min-width:0;overflow:hidden;">
         <div class="text-xs font-bold text-muted uppercase tracking-widest mb-3">지출 구성</div>
-        <div style="position:relative;height:200px;"><canvas id="c-donut"></canvas></div>
+        <div class="chart-wrap-donut" style="position:relative;height:200px;width:100%;"><canvas id="c-donut"></canvas></div>
         <div id="donut-leg" class="mt-3 space-y-1.5"></div>
       </div>
-      <div class="md:col-span-3 bg-white rounded-2xl border border-border p-4">
+      <div class="md:col-span-3 bg-white rounded-2xl border border-border p-4" style="min-width:0;overflow:hidden;">
         <div class="text-xs font-bold text-muted uppercase tracking-widest mb-3">카테고리별 지출</div>
-        <div style="position:relative;height:240px;"><canvas id="c-bar"></canvas></div>
+        <div class="chart-wrap-bar" style="position:relative;height:240px;width:100%;"><canvas id="c-bar"></canvas></div>
       </div>
     </div>
     <div class="bg-white rounded-2xl border border-border p-4">
@@ -402,12 +461,13 @@ html{height:100%;}
           <table class="tbl"><thead><tr>
             <th>항목명</th><th>카테고리</th><th>결제수단</th><th>결제일</th><th class="text-right">금액</th><th>적용기간</th><th></th>
           </tr></thead><tbody id="fx-tbody"></tbody>
-          <tfoot><tr>
-            <td colspan="4">고정지출 합계</td>
-            <td id="fx-total" class="text-right text-exp"></td><td colspan="2"></td>
-          </tr></tfoot>
           </table>
         </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#F9F8F5;border-top:1px solid #E5E2DA;flex-wrap:wrap;gap:6px;">
+          <span style="font-size:13px;font-weight:600;color:#111827;">고정지출 합계</span>
+          <span id="fx-total" style="font-size:15px;font-weight:700;color:#DC2626;white-space:nowrap;"></span>
+        </div>
+      </div>
       </div>
     </div>
     <!-- 카드별 뷰 -->
@@ -415,9 +475,9 @@ html{height:100%;}
   </div>
 
   <!-- ── 대출/자산 ── -->
-  <div id="v-loan" class="hidden p-4 md:p-6 space-y-4">
+  <div id="v-loan" class="hidden md:p-6 space-y-4" style="padding:14px;">
     <!-- KPI -->
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="loan-kpi"></div>
+    <div class="grid grid-cols-3 gap-2 md:gap-3" id="loan-kpi" style="align-items:stretch;"></div>
     <!-- 대출 입력 -->
     <div class="bg-white rounded-2xl border border-border p-4">
       <div class="text-xs font-bold text-muted uppercase tracking-widest mb-4">대출 추가</div>
@@ -457,16 +517,16 @@ html{height:100%;}
       <div class="p-4 border-b border-border text-xs font-bold text-muted uppercase tracking-widest">대출 현황</div>
       <div class="overflow-x-auto">
         <table class="tbl"><thead><tr>
-          <th>금융사</th><th class="text-right">잔액</th><th class="text-right">추정잔액</th>
-          <th class="text-right">월원금</th><th class="text-right">월이자</th><th>납입일</th><th>경과</th><th></th>
+          <th>금융사</th><th class="text-right mobile-hide-col">잔액</th><th class="text-right">추정잔액</th>
+          <th class="text-right">월원금</th><th class="text-right mobile-hide-col">월이자</th><th class="mobile-hide-col">납입일</th><th class="mobile-hide-col">경과</th><th></th>
         </tr></thead><tbody id="ln-tbody"></tbody>
         <tfoot><tr>
           <td>합계</td>
-          <td id="ln-t-bal" class="text-right text-exp"></td>
+          <td id="ln-t-bal" class="text-right text-exp mobile-hide-col"></td>
           <td id="ln-t-cur" class="text-right text-exp"></td>
           <td id="ln-t-prin" class="text-right"></td>
-          <td id="ln-t-int" class="text-right"></td>
-          <td colspan="3"></td>
+          <td id="ln-t-int" class="text-right mobile-hide-col"></td>
+          <td colspan="3" class="mobile-hide-col"></td>
         </tr></tfoot>
         </table>
       </div>
@@ -521,13 +581,13 @@ html{height:100%;}
   <div id="v-trend" class="hidden p-4 md:p-6 space-y-4">
     <div class="bg-white rounded-2xl border border-border p-4">
       <div class="text-xs font-bold text-muted uppercase tracking-widest mb-3" id="trend-title">월별 지출 추이</div>
-      <div style="position:relative;height:280px;"><canvas id="c-trend"></canvas></div>
+      <div class="chart-wrap-trend" style="position:relative;height:280px;"><canvas id="c-trend"></canvas></div>
     </div>
     <div class="bg-white rounded-2xl border border-border overflow-hidden">
       <div class="overflow-x-auto">
         <table class="tbl"><thead><tr>
-          <th>월</th><th class="text-right">고정지출</th><th class="text-right">변동지출</th>
-          <th class="text-right">대출상환</th><th class="text-right">수입</th><th class="text-right">총지출</th>
+          <th>월</th><th class="text-right mobile-hide-col">고정지출</th><th class="text-right mobile-hide-col">변동지출</th>
+          <th class="text-right mobile-hide-col">대출상환</th><th class="text-right">수입</th><th class="text-right">총지출</th>
         </tr></thead><tbody id="trend-tbody"></tbody></table>
       </div>
     </div>
@@ -535,11 +595,6 @@ html{height:100%;}
 
 </main>
 </div>
-
-<!-- FAB: 모바일 빠른 입력 -->
-<button class="quick-btn" onclick="switchView('ledger');setTimeout(function(){var el=document.getElementById('f-content');if(el)el.focus();},300);" title="거래 추가">
-  <i class="fa-solid fa-plus" style="font-size:18px;"></i>
-</button>
 
 <!-- MOBILE BOTTOM NAV -->
 <nav id="bot-nav" class="hidden">
@@ -552,7 +607,7 @@ html{height:100%;}
 </nav>
 
 <!-- ══════════ 수정 모달 ══════════ -->
-<div id="modal-bg" class="modal-bg hidden">
+<div id="modal-bg" class="modal-bg">
   <div class="modal-box">
     <div class="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
       <h2 id="modal-title" class="font-bold text-base">수정</h2>
@@ -619,6 +674,10 @@ var fmtK = function(n){
   return str+'만원';
 };
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// 모바일 여부 + 차트 폰트 크기 헬퍼 (모바일에서 차트 글씨 더 크게)
+function isMobileView(){ return window.innerWidth < 768; }
+function cfSize(mobileSize, pcSize){ return isMobileView() ? mobileSize : pcSize; }
 function parseNum(s){ return parseInt(String(s||0).replace(/,/g,''))||0; }
 function thisMonth(){ var n=new Date(); return n.getFullYear()+'-'+(n.getMonth()<9?'0':'')+(n.getMonth()+1); }
 function getMonthTxs(m){ var mo=m||state.month; return D.txs.filter(function(t){return t.date&&t.date.indexOf(mo)===0;}); }
@@ -694,7 +753,9 @@ function init(){
   // 거래 필터
   var filt = document.getElementById('filt-type');
   if(filt) filt.addEventListener('change',function(){renderLedger();});
-  window.addEventListener('resize',function(){renderTxs();});
+  window.addEventListener('resize',function(){renderTxs();renderDash();if(state.view==='trend')renderTrend();});
+  // 초기 화면 상태를 명시적으로 보장 (대시보드만 보이게)
+  switchView('dash');
 }
 
 /* ════════════════════════════════════════════════
@@ -828,7 +889,7 @@ function renderDash(){
   if(dCtx){
     var dLabels=['직접지출','고정지출','대출상환'], dVals=[expDirect,fixedTot,loanPay], dColors=['#F59E0B','#6366F1','#EF4444'];
     var dTot = expDirect+fixedTot+loanPay;
-    charts.donut = new Chart(dCtx.getContext('2d'),{type:'doughnut',data:{labels:dLabels,datasets:[{data:dVals,backgroundColor:dColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+fmt(c.raw);}}}}}});
+    charts.donut = new Chart(dCtx.getContext('2d'),{type:'doughnut',data:{labels:dLabels,datasets:[{data:dVals,backgroundColor:dColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{bodyFont:{size:13},titleFont:{size:13},callbacks:{label:function(c){return c.label+': '+fmt(c.raw);}}}}}});
     document.getElementById('donut-leg').innerHTML = dLabels.map(function(l,i){
       var pct = dTot?Math.round(dVals[i]/dTot*100):0;
       return '<div class="flex items-center justify-between text-xs">'+
@@ -848,7 +909,7 @@ function renderDash(){
     charts.bar = new Chart(bCtx.getContext('2d'),{
       type:'bar',
       data:{labels:sorted.map(function(e){return e[0].replace(/^\S+ /,'').slice(0,5);}),datasets:[{data:sorted.map(function(e){return e[1];}),backgroundColor:'#6366F1',borderRadius:5,borderSkipped:false}]},
-      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmt(c.raw);}}}},scales:{x:{grid:{color:'#F1F0EC'},border:{display:false},ticks:{font:{size:10},callback:function(v){return fmtK(v);}}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:11}}}}}
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{bodyFont:{size:13},titleFont:{size:13},callbacks:{label:function(c){return ' '+fmt(c.raw);}}}},scales:{x:{grid:{color:'#F1F0EC'},border:{display:false},ticks:{font:{size:cfSize(12,10)},callback:function(v){return fmtK(v);}}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:cfSize(13,11)}}}}}
     });
   }
 
@@ -881,11 +942,11 @@ function renderTxs(){
           '<div class="tx-icon" style="background:'+bg+'">'+em+'</div>'+
           '<div style="flex:1;min-width:0;">'+
             '<div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(t.content)+'</div>'+
-            '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">'+
-              '<span>'+esc(t.date?t.date.slice(5):'')+'</span>'+
-              (t.cat?'<span style="background:#F3F4F6;padding:1px 6px;border-radius:8px;">'+esc(t.cat.replace(/^\S+ /,''))+'</span>':'')+
-              (t.pay?'<span>💳 '+esc(t.pay)+'</span>':'')+
-              (t.instTotal?'<span style="background:#FEF3C7;color:#B45309;padding:1px 6px;border-radius:8px;">할부 '+t.instSeq+'/'+t.instTotal+'</span>':'')+
+            '<div style="font-size:11px;color:#9CA3AF;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'+
+              '<span style="white-space:nowrap;">'+esc(t.date?t.date.slice(5):'')+'</span>'+
+              (t.cat?'<span style="background:#F3F4F6;padding:1px 6px;border-radius:8px;white-space:nowrap;">'+esc(t.cat.replace(/^\S+ /,''))+'</span>':'')+
+              (t.pay?'<span style="white-space:nowrap;">💳 '+esc(t.pay)+'</span>':'')+
+              (t.instTotal?'<span style="background:#FEF3C7;color:#B45309;padding:1px 6px;border-radius:8px;white-space:nowrap;">할부 '+t.instSeq+'/'+t.instTotal+'</span>':'')+
             '</div>'+
           '</div>'+
           '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">'+
@@ -1104,7 +1165,7 @@ function renderFixed(){
   }).join(''):'<tr><td colspan="7" class="text-center py-8 text-muted">고정지출을 추가해주세요</td></tr>';
 
   var ft = document.getElementById('fx-total');
-  if(ft) ft.textContent = fmt(tot)+' ('+state.month+' 기준)';
+  if(ft) ft.textContent = fmt(tot)+' · '+state.month;
 
   // 카드별 뷰 (현재 월 적용중인 것만 카드별로 묶음)
   var cmap = {};
@@ -1141,12 +1202,12 @@ function renderLoan(){
     totBal+=l.bal; totCur+=cur; totPrin+=l.prin; totInt+=l.int;
     return '<tr>'+
       '<td class="font-medium">'+esc(l.name)+'</td>'+
-      '<td class="text-right text-muted text-xs">'+fmt(l.bal)+'</td>'+
+      '<td class="text-right text-muted text-xs mobile-hide-col">'+fmt(l.bal)+'</td>'+
       '<td class="text-right font-semibold text-exp">'+fmt(cur)+(red>0?'<div class="text-xs text-inc">↓'+fmt(red)+' 차감</div>':'')+(l.prin===0?'<div class="text-xs text-muted">이자만</div>':'')+'</td>'+
       '<td class="text-right text-xs">'+fmt(l.prin)+'</td>'+
-      '<td class="text-right text-xs text-muted">'+fmt(l.int)+'</td>'+
-      '<td class="text-center text-xs text-muted">'+(l.due?'매월 '+l.due+'일':'-')+'</td>'+
-      '<td class="text-xs text-muted">'+(l.prin?mo+'개월':'수동')+'</td>'+
+      '<td class="text-right text-xs text-muted mobile-hide-col">'+fmt(l.int)+'</td>'+
+      '<td class="text-center text-xs text-muted mobile-hide-col">'+(l.due?'매월 '+l.due+'일':'-')+'</td>'+
+      '<td class="text-xs text-muted mobile-hide-col">'+(l.prin?mo+'개월':'수동')+'</td>'+
       '<td class="whitespace-nowrap">'+
         '<button class="text-xs text-blue-500 hover:underline mr-2" onclick="editLoan('+l.id+')">수정</button>'+
         '<button class="text-xs text-red-500 hover:underline" onclick="delLoan('+l.id+')">삭제</button>'+
@@ -1218,8 +1279,8 @@ function renderTrend(){
       {label:'수입',data:incArr,type:'line',borderColor:'#10B981',backgroundColor:'transparent',pointBackgroundColor:'#10B981',pointRadius:3,borderWidth:2,tension:.3,order:0},
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:14,usePointStyle:true}}},
-      scales:{x:{stacked:true,grid:{display:false},border:{display:false},ticks:{font:{size:11}}},y:{stacked:true,grid:{color:'#F3F2EF'},border:{display:false},ticks:{font:{size:10},callback:function(v){return fmtK(v);}}}}}
+      plugins:{legend:{position:'bottom',labels:{font:{size:cfSize(12,11)},padding:14,usePointStyle:true}},tooltip:{bodyFont:{size:13},titleFont:{size:13}}},
+      scales:{x:{stacked:true,grid:{display:false},border:{display:false},ticks:{font:{size:cfSize(11,11)}}},y:{stacked:true,grid:{color:'#F3F2EF'},border:{display:false},ticks:{font:{size:cfSize(11,10)},callback:function(v){return fmtK(v);}}}}}
   });
 
   // 테이블
@@ -1227,9 +1288,9 @@ function renderTrend(){
   if(tb) tb.innerHTML=monthsOfYear.map(function(m,i){
     return '<tr style="'+(m===state.month?'background:#FEFCE8;font-weight:700;':'')+'">'+
       '<td>'+MNAMES[i]+'</td>'+
-      '<td class="text-right text-indigo-600">'+fmtK(fixedArr[i])+'</td>'+
-      '<td class="text-right text-amber-600">'+fmtK(varArr[i])+'</td>'+
-      '<td class="text-right text-red-500">'+fmtK(loanArr[i])+'</td>'+
+      '<td class="text-right text-indigo-600 mobile-hide-col">'+fmtK(fixedArr[i])+'</td>'+
+      '<td class="text-right text-amber-600 mobile-hide-col">'+fmtK(varArr[i])+'</td>'+
+      '<td class="text-right text-red-500 mobile-hide-col">'+fmtK(loanArr[i])+'</td>'+
       '<td class="text-right text-inc">'+fmtK(incArr[i])+'</td>'+
       '<td class="text-right font-bold">'+fmtK(totArr[i])+'</td>'+
       '</tr>';
@@ -1365,9 +1426,9 @@ function openModal(title, fieldsHTML, onSave, onDel){
   document.getElementById('modal-body').querySelectorAll('.num').forEach(numify);
   document.getElementById('modal-save').onclick = onSave;
   document.getElementById('modal-del').onclick = onDel;
-  document.getElementById('modal-bg').classList.remove('hidden');
+  document.getElementById('modal-bg').classList.add('show');
 }
-function closeModal(){ document.getElementById('modal-bg').classList.add('hidden'); _editCtx=null; }
+function closeModal(){ document.getElementById('modal-bg').classList.remove('show'); _editCtx=null; }
 document.getElementById('modal-bg').addEventListener('click',function(e){ if(e.target===this)closeModal(); });
 
 function mField(label,id,type,val,extra){
