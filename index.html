@@ -9,6 +9,33 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<!-- Firebase Firestore: 실시간 동기화용 -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, doc, setDoc, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCO20R1v55lR2w67fz-oy9IkzLqgxLeLhI",
+    authDomain: "future-ttottoi.firebaseapp.com",
+    projectId: "future-ttottoi",
+    storageBucket: "future-ttottoi.firebasestorage.app",
+    messagingSenderId: "270665862074",
+    appId: "1:270665862074:web:f9c703b2cd8cfeddd4ab83"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const db = getFirestore(fbApp);
+
+  // 가계부 전체 데이터를 문서 하나(zzoppu/data)에 저장 — 간단하고 충분함
+  const DOC_REF = doc(db, "zzoppu", "data");
+
+  // 전역에서 쓸 수 있게 window에 노출
+  window.__fb = { db, doc, setDoc, onSnapshot, serverTimestamp, DOC_REF };
+  window.__fbReady = true;
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
 <script>
 tailwind.config={theme:{extend:{colors:{ink:'#111827',soft:'#F9F8F5',card:'#FFFFFF',border:'#E5E2DA',muted:'#6B7280',inc:'#059669',exp:'#DC2626',fix:'#6366F1',loan:'#D97706'}}}}
 </script>
@@ -182,6 +209,7 @@ main *{box-sizing:border-box;}
   <div class="p-5 border-b" style="border-color:rgba(255,255,255,.1)">
     <div class="text-white font-bold text-sm">🏠 쬬쀼 가계부</div>
     <div id="sb-date" class="text-xs mt-1" style="color:rgba(255,255,255,.35)"></div>
+    <div id="sync-status" class="text-xs mt-1" style="color:rgba(255,255,255,.35)">🔄 동기화 중...</div>
   </div>
   <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
     <div class="sb-item active" data-v="dash"><i class="fa-solid fa-chart-pie w-4"></i>대시보드</div>
@@ -204,6 +232,7 @@ main *{box-sizing:border-box;}
   <!-- TOPBAR -->
   <header class="sticky top-0 z-100 flex items-center gap-3 px-4 md:px-6" style="height:52px;background:rgba(249,248,245,.95);backdrop-filter:blur(8px);border-bottom:1px solid #E5E2DA;z-index:100;">
     <span class="font-bold text-sm md:hidden">🏠 쬬쀼 가계부</span>
+    <span id="sync-dot-mobile" class="md:hidden" style="font-size:10px;color:#9CA3AF;" title="동기화 상태">🔄</span>
     <div id="month-nav" class="flex items-center gap-1.5 overflow-x-auto flex-1" style="scrollbar-width:none;-ms-overflow-style:none;"></div>
     <button onclick="exportExcel()" class="flex-shrink-0 flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 transition-colors">
       <i class="fa-solid fa-file-excel"></i><span class="hidden sm:inline">엑셀</span>
@@ -627,11 +656,11 @@ main *{box-sizing:border-box;}
 
 <script>
 /* ════════════════════════════════════════════════
-   1. 데이터 스토리지
+   1. 데이터 스토리지 — Firebase Firestore 실시간 동기화
 ═══════════════════════════════════════════════════ */
 var KEYS = {cards:'zz2_cards', acs:'zz2_acs', loans:'zz2_loans', assets:'zz2_assets', fixed:'zz2_fixed', txs:'zz2_txs', cats:'zz2_cats', years:'zz2_years'};
 
-// localStorage 사용 가능 여부
+// localStorage는 오프라인 백업용으로만 사용
 var _ls = (function(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true;}catch(e){return false;}})();
 var _mem = {};
 function lsGet(k){try{return _ls?localStorage.getItem(k):(_mem[k]||null);}catch(e){return null;}}
@@ -643,22 +672,92 @@ var D = {
   years: ['2026']
 };
 
-// 샘플 초기 데이터
+// 샘플 초기 데이터 (Firestore에 데이터가 전혀 없을 때만 사용)
 var SEED = {
   cards: [], acs: [], loans: [], assets: [], fixed: [], txs: [],
   years: ['2026']
 };
 
-function loadData(){
+var _fbSyncing = false;     // 내가 지금 저장 중인지 (무한루프 방지용)
+var _fbConnected = false;   // Firestore 연결 성공 여부
+var _fbUnsub = null;        // 실시간 리스너 해제 함수
+var _onRemoteUpdate = null; // 원격 변경 감지 시 호출할 콜백 (init에서 등록)
+
+// 로컬 백업에서 우선 불러오기 (오프라인 대비 즉시 화면 표시용)
+function loadLocalBackup(){
   var keys = Object.keys(KEYS);
   for(var i=0;i<keys.length;i++){
     var k = keys[i];
     var v = lsGet(KEYS[k]);
     if(v){ try{D[k]=JSON.parse(v);}catch(e){} }
-    else if(SEED[k]){ D[k] = JSON.parse(JSON.stringify(SEED[k])); saveData(k); }
+    else if(SEED[k]){ D[k] = JSON.parse(JSON.stringify(SEED[k])); }
   }
 }
-function saveData(k){ lsSet(KEYS[k], JSON.stringify(D[k])); }
+
+// Firestore에 전체 데이터 저장 (다른 기기들도 실시간으로 받게 됨)
+function saveData(k){
+  // 로컬 백업은 항상 즉시 저장 (오프라인 대비)
+  lsSet(KEYS[k], JSON.stringify(D[k]));
+  // Firestore로 전체 동기화
+  if(!window.__fb) return; // 아직 Firebase 로드 전이면 스킵 (로컬엔 이미 저장됨)
+  _fbSyncing = true;
+  var payload = {};
+  Object.keys(KEYS).forEach(function(key){ payload[key] = D[key]; });
+  payload._updatedAt = window.__fb.serverTimestamp();
+  window.__fb.setDoc(window.__fb.DOC_REF, payload, { merge: true })
+    .catch(function(err){ console.error('Firestore 저장 실패:', err); })
+    .finally(function(){ setTimeout(function(){ _fbSyncing = false; }, 300); });
+}
+
+// 최초 1회: Firestore에서 데이터 가져오기 + 실시간 리스너 연결
+function connectFirestoreSync(onUpdate){
+  _onRemoteUpdate = onUpdate;
+  if(!window.__fb){
+    // Firebase 모듈이 아직 안 로드됐으면 잠시 후 재시도
+    window.addEventListener('firebase-ready', function(){ connectFirestoreSync(onUpdate); }, { once:true });
+    return;
+  }
+  if(_fbUnsub) return; // 이미 연결됨
+
+  _fbUnsub = window.__fb.onSnapshot(window.__fb.DOC_REF, function(snap){
+    _fbConnected = true;
+    updateSyncStatusUI(true);
+    if(_fbSyncing) return; // 내가 막 저장한 직후의 echo는 무시 (불필요한 재렌더 방지)
+    if(!snap.exists()){
+      // Firestore에 데이터가 아예 없으면(첫 사용) 현재(로컬/SEED) 데이터를 올려보냄
+      var keys = Object.keys(KEYS);
+      keys.forEach(function(k){ saveData(k); });
+      return;
+    }
+    var remote = snap.data();
+    var changed = false;
+    Object.keys(KEYS).forEach(function(k){
+      if(remote[k] !== undefined){
+        D[k] = remote[k];
+        lsSet(KEYS[k], JSON.stringify(remote[k])); // 로컬 백업도 갱신
+        changed = true;
+      }
+    });
+    if(changed && _onRemoteUpdate) _onRemoteUpdate();
+  }, function(err){
+    console.error('Firestore 연결 오류 (오프라인 모드로 계속 사용 가능):', err);
+    updateSyncStatusUI(false);
+  });
+}
+
+// 동기화 상태를 화면에 표시 (사이드바 + 모바일 헤더)
+function updateSyncStatusUI(connected){
+  var sb = document.getElementById('sync-status');
+  var dot = document.getElementById('sync-dot-mobile');
+  if(connected){
+    if(sb){ sb.textContent='🟢 실시간 동기화됨'; sb.style.color='rgba(16,185,129,.8)'; }
+    if(dot){ dot.textContent='🟢'; }
+  } else {
+    if(sb){ sb.textContent='⚪ 오프라인 (로컬 저장)'; sb.style.color='rgba(255,255,255,.35)'; }
+    if(dot){ dot.textContent='⚪'; }
+  }
+}
+
 function nextId(){ return Date.now() + Math.floor(Math.random()*1000); }
 
 /* ════════════════════════════════════════════════
@@ -722,13 +821,13 @@ var state = { view:'dash', month:'' };
 var charts = {};
 
 function init(){
-  loadData();
+  loadLocalBackup(); // 로컬 백업으로 즉시 화면부터 그림 (오프라인이어도 빠르게 보임)
   var n = new Date();
   // 시작 연도 2026 고정, 현재 월 자동 선택 (2026년 이후면 현재 연도 사용)
   var curRealYear = n.getFullYear();
   var startYear = curRealYear >= 2026 ? String(curRealYear) : '2026';
   // D.years에 없으면 추가
-  if((D.years||[]).indexOf(startYear) < 0){ D.years = (D.years||['2026']).concat([startYear]).sort(); saveData('years'); }
+  if((D.years||[]).indexOf(startYear) < 0){ D.years = (D.years||['2026']).concat([startYear]).sort(); }
   state.month = startYear+'-'+(n.getMonth()<9?'0':'')+(n.getMonth()+1);
   // 헤더 날짜
   var sd = document.getElementById('sb-date');
@@ -739,6 +838,16 @@ function init(){
   fillSelects();
   toggleInstallField();
   renderAll();
+
+  // Firestore 실시간 동기화 연결 — 다른 기기에서 변경하면 자동으로 화면 갱신됨
+  connectFirestoreSync(function(){
+    renderMonthNav();
+    fillSelects();
+    renderAll();
+  });
+  // 연결 후 혹시 새로 추가된 시작연도가 있으면 반영 (약간의 지연을 두고 1회 저장)
+  setTimeout(function(){ if(window.__fb) saveData('years'); }, 1200);
+
   // 탭 이벤트
   document.querySelectorAll('.sb-item,[data-v]').forEach(function(el){
     el.addEventListener('click',function(){ if(el.dataset.v) switchView(el.dataset.v); });
